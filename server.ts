@@ -767,15 +767,14 @@ bot.command('remote', async ctx => {
       ['capture-pane', '-p', '-S', '-1000', '-t', REMOTE_SESSION],
       { encoding: 'utf8', timeout: 5000 },
     )
-    // Session URL is in OSC8 hyperlinks (\x1B]8;;URL\x07) — extract before stripping ANSI
-    const sessionMatch = raw.match(/\x1B\]8;;(https:\/\/claude\.ai\/code\/session_[A-Za-z0-9-]+)[^\x07]*\x07/)
+    // Session URL appears in OSC8 hyperlinks — search raw output directly (no ANSI stripping needed)
+    const sessionMatch = raw.match(/https:\/\/claude\.ai\/code\/session_[A-Za-z0-9-]+/)
     if (sessionMatch) {
-      await ctx.reply(sessionMatch[1])
+      await ctx.reply(sessionMatch[0])
       return
     }
-    // Fallback: bridge URL in plain text
-    const clean = raw.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/\x1B\][^\x07]*\x07/g, '')
-    const bridgeMatch = clean.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
+    // Fallback: bridge URL (appears in plain text)
+    const bridgeMatch = raw.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
     if (!bridgeMatch) {
       await ctx.reply('Remote Control not running or session not yet ready. Try again in a few seconds.')
       return
