@@ -22,6 +22,7 @@ import { randomBytes } from 'crypto'
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, statSync, renameSync, realpathSync, chmodSync } from 'fs'
 import { homedir } from 'os'
 import { join, extname, sep } from 'path'
+import { execFileSync } from 'child_process'
 
 const STATE_DIR = process.env.TELEGRAM_STATE_DIR ?? join(homedir(), '.claude', 'channels', 'telegram')
 const ACCESS_FILE = join(STATE_DIR, 'access.json')
@@ -719,6 +720,35 @@ bot.command('status', async ctx => {
   await ctx.reply(`Not paired. Send me a message to get a pairing code.`)
 })
 
+
+const SCREENSHOT_SESSION = process.env.TELEGRAM_SCREENSHOT_SESSION ?? 'claude-telegram:0.0'
+
+bot.command('screenshot', async ctx => {
+  if (ctx.chat?.type !== 'private') return
+  const from = ctx.from
+  if (!from) return
+  const access = loadAccess()
+  if (!access.allowFrom.includes(String(from.id))) {
+    await ctx.reply('Not authorized.')
+    return
+  }
+  try {
+    const output = execFileSync(
+      'tmux',
+      ['capture-pane', '-p', '-S', '-32768', '-t', SCREENSHOT_SESSION],
+      { encoding: 'utf8', timeout: 5000 },
+    )
+    mkdirSync(INBOX_DIR, { recursive: true })
+    const path = join(INBOX_DIR, `screenshot-${Date.now()}.txt`)
+    writeFileSync(path, output)
+    await bot.api.sendDocument(ctx.chat.id, new InputFile(path), {
+      caption: `📟 tmux ${SCREENSHOT_SESSION}`,
+    })
+  } catch (err) {
+    await ctx.reply(`screenshot failed: ${err instanceof Error ? err.message : err}`)
+  }
+})
+
 // Inline-button handler for permission requests. Callback data is
 // `perm:allow:<id>`, `perm:deny:<id>`, or `perm:more:<id>`.
 // Security mirrors the text-reply path: allowFrom must contain the sender.
@@ -1003,6 +1033,7 @@ void (async () => {
               { command: 'start', description: 'Welcome and setup guide' },
               { command: 'help', description: 'What this bot can do' },
               { command: 'status', description: 'Check your pairing status' },
+              { command: 'screenshot', description: 'Capture tmux session as text file' },
             ],
             { scope: { type: 'all_private_chats' } },
           ).catch(() => {})
