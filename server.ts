@@ -767,14 +767,20 @@ bot.command('remote', async ctx => {
       ['capture-pane', '-p', '-S', '-1000', '-t', REMOTE_SESSION],
       { encoding: 'utf8', timeout: 5000 },
     )
-    // Strip ANSI escape sequences
-    const clean = raw.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/\x1B\][^\x07]*\x07/g, '')
-    const match = clean.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
-    if (!match) {
-      await ctx.reply('Remote Control not running or URL not found yet. Try `sudo systemctl start claude-remote`.')
+    // Session URL is in OSC8 hyperlinks (\x1B]8;;URL\x07) — extract before stripping ANSI
+    const sessionMatch = raw.match(/\x1B\]8;;(https:\/\/claude\.ai\/code\/session_[A-Za-z0-9-]+)[^\x07]*\x07/)
+    if (sessionMatch) {
+      await ctx.reply(sessionMatch[1])
       return
     }
-    await ctx.reply(match[0])
+    // Fallback: bridge URL in plain text
+    const clean = raw.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/\x1B\][^\x07]*\x07/g, '')
+    const bridgeMatch = clean.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
+    if (!bridgeMatch) {
+      await ctx.reply('Remote Control not running or session not yet ready. Try again in a few seconds.')
+      return
+    }
+    await ctx.reply(bridgeMatch[0])
   } catch (err) {
     await ctx.reply(`remote failed: ${err instanceof Error ? err.message : err}`)
   }
