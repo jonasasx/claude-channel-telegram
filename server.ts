@@ -749,6 +749,37 @@ bot.command('screenshot', async ctx => {
   }
 })
 
+
+const REMOTE_SESSION = process.env.TELEGRAM_REMOTE_SESSION ?? 'claude-remote:0.0'
+
+bot.command('remote', async ctx => {
+  if (ctx.chat?.type !== 'private') return
+  const from = ctx.from
+  if (!from) return
+  const access = loadAccess()
+  if (!access.allowFrom.includes(String(from.id))) {
+    await ctx.reply('Not authorized.')
+    return
+  }
+  try {
+    const raw = execFileSync(
+      'tmux',
+      ['capture-pane', '-p', '-S', '-1000', '-t', REMOTE_SESSION],
+      { encoding: 'utf8', timeout: 5000 },
+    )
+    // Strip ANSI escape sequences
+    const clean = raw.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/\x1B\][^\x07]*\x07/g, '')
+    const match = clean.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
+    if (!match) {
+      await ctx.reply('Remote Control not running or URL not found yet. Try `sudo systemctl start claude-remote`.')
+      return
+    }
+    await ctx.reply(match[0])
+  } catch (err) {
+    await ctx.reply(`remote failed: ${err instanceof Error ? err.message : err}`)
+  }
+})
+
 // Inline-button handler for permission requests. Callback data is
 // `perm:allow:<id>`, `perm:deny:<id>`, or `perm:more:<id>`.
 // Security mirrors the text-reply path: allowFrom must contain the sender.
@@ -1033,6 +1064,7 @@ void (async () => {
               { command: 'start', description: 'Welcome and setup guide' },
               { command: 'status', description: 'Check your pairing status' },
               { command: 'screenshot', description: 'Capture tmux session as text file' },
+              { command: 'remote', description: 'Get remote control link for claude.ai/code' },
             ],
             { scope: { type: 'all_private_chats' } },
           ).catch(() => {})
