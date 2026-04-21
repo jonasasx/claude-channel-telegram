@@ -750,7 +750,7 @@ bot.command('screenshot', async ctx => {
 })
 
 
-const REMOTE_SESSION = process.env.TELEGRAM_REMOTE_SESSION ?? 'claude-remote:0.0'
+const REMOTE_URL_FILE = join(STATE_DIR, 'remote-url.txt')
 
 bot.command('remote', async ctx => {
   if (ctx.chat?.type !== 'private') return
@@ -762,26 +762,10 @@ bot.command('remote', async ctx => {
     return
   }
   try {
-    const raw = execFileSync(
-      'tmux',
-      ['capture-pane', '-p', '-e', '-S', '-1000', '-t', REMOTE_SESSION],
-      { encoding: 'utf8', timeout: 5000 },
-    )
-    // Session URL appears in OSC8 hyperlinks — search raw output directly (no ANSI stripping needed)
-    const sessionMatch = raw.match(/https:\/\/claude\.ai\/code\/session_[A-Za-z0-9-]+/)
-    if (sessionMatch) {
-      await ctx.reply(sessionMatch[0])
-      return
-    }
-    // Fallback: bridge URL (appears in plain text)
-    const bridgeMatch = raw.match(/https:\/\/claude\.ai\/code\?bridge=[A-Za-z0-9_]+/)
-    if (!bridgeMatch) {
-      await ctx.reply('Remote Control not running or session not yet ready. Try again in a few seconds.')
-      return
-    }
-    await ctx.reply(bridgeMatch[0])
-  } catch (err) {
-    await ctx.reply(`remote failed: ${err instanceof Error ? err.message : err}`)
+    const url = readFileSync(REMOTE_URL_FILE, 'utf8').trim()
+    await ctx.reply(url)
+  } catch {
+    await ctx.reply('Remote Control not running. Start with: sudo systemctl start claude-remote')
   }
 })
 
