@@ -1031,7 +1031,6 @@ void (async () => {
           void bot.api.setMyCommands(
             [
               { command: 'start', description: 'Welcome and setup guide' },
-              { command: 'help', description: 'What this bot can do' },
               { command: 'status', description: 'Check your pairing status' },
               { command: 'screenshot', description: 'Capture tmux session as text file' },
             ],
