@@ -764,7 +764,7 @@ bot.command('remote', async ctx => {
   try {
     const raw = execFileSync(
       'tmux',
-      ['capture-pane', '-p', '-S', '-1000', '-t', REMOTE_SESSION],
+      ['capture-pane', '-p', '-e', '-S', '-1000', '-t', REMOTE_SESSION],
       { encoding: 'utf8', timeout: 5000 },
     )
     // Session URL appears in OSC8 hyperlinks — search raw output directly (no ANSI stripping needed)
